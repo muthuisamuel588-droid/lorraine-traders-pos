@@ -1,18 +1,12 @@
 {
   "name": "lorraine-traders-pos",
   "version": "1.0.0",
-  "description": "Lorraine Traders retail shop POS system (local + Vercel serverless demo)",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "vercel-dev": "npx vercel dev"
-  },
+  "description": "Lorraine Traders retail shop POS — Vercel serverless demo",
+  "main": "api/index.js",
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.21.0",
-    "sql.js": "^1.11.0",
-    "multer": "^1.4.5-lts.1"
+    "express": "^4.21.0"
   }
 }

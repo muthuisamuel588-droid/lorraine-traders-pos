@@ -1,12 +1,6 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/((?!css/|js/|uploads/|favicon).*)", "destination": "/api" }
-  ],
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "server.js"
-    }
-  }
+    { "source": "/api/(.*)", "destination": "/api" }
+  ]
 }
