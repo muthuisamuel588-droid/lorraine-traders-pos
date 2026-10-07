@@ -1,15 +1,1 @@
-# Lorraine Traders POS (Vercel demo)
-
-Serverless demo of the Lorraine Traders retail POS.
-
-**Data is in-memory only** — resets on every cold start. Not for production shop use.
-
-## Login
-- admin / admin123
-- system / system123
-
-## Local
-```bash
-npm install
-npm start
-```
+# Lorraine Traders POS (Vercel demo)\n\n**In-memory only** - data resets on cold start. Not for production tills.\n\n## Deploy\nImport this repo in Vercel (Framework: Express).\n\n## Login\n- admin / admin123\n- system / system123\n\nFull source: server.js, public/js/app.js need to be uploaded for full UI.\n
