@@ -1,18 +1,15 @@
-// Minimal serverless POS API for Vercel demo (in-memory).
 const express = require('express');
 const crypto = require('crypto');
-
 const app = express();
 app.use(express.json({ limit: '1mb' }));
-
 const SALT = 'lorraine-salt-2026';
 function hashPassword(pw) {
   return crypto.createHash('sha256').update(SALT + String(pw)).digest('hex');
 }
-
 const users = [
-  { id: 1, username: 'admin', password_hash: hashPassword('admin123'), full_name: 'Admin', role: 'admin', active: 1 },
-  { id: 2, username: 'cashier', password_hash: hashPassword('cashier123'), full_name: 'Cashier', role: 'cashier', active: 1 },
+  { id: 1, username: 'admin', password_hash: hashPassword('admin123'), full_name: 'Administrator', role: 'admin', active: 1 },
+  { id: 2, username: 'system', password_hash: hashPassword('system123'), full_name: 'System', role: 'system', active: 1 },
+  { id: 3, username: 'cashier', password_hash: hashPassword('cashier123'), full_name: 'Cashier', role: 'cashier', active: 1 },
 ];
 const sessions = new Map();
 const products = [
@@ -26,11 +23,7 @@ const categories = [
 ];
 let nextOrderId = 1;
 const orders = [];
-
-function token() {
-  return crypto.randomBytes(24).toString('hex');
-}
-
+function token() { return crypto.randomBytes(24).toString('hex'); }
 function requireAuth(req, res, next) {
   const t = req.headers['x-auth-token'] || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const session = sessions.get(t);
@@ -39,26 +32,12 @@ function requireAuth(req, res, next) {
   req.token = t;
   next();
 }
-
 app.get('/api/health', (req, res) => {
-  res.json({
-    ok: true,
-    service: 'Lorraine Traders POS',
-    mode: 'serverless',
-    persistence: 'in-memory (resets on cold start)',
-    time: new Date().toISOString(),
-  });
+  res.json({ ok: true, service: 'Lorraine Traders POS', mode: 'serverless', persistence: 'in-memory (resets on cold start)', time: new Date().toISOString() });
 });
-
 app.get('/api/license', (req, res) => {
-  res.json({
-    can_access: true,
-    status: 'demo',
-    message: 'Vercel demo license — always active',
-    expires_at: null,
-  });
+  res.json({ can_access: true, status: 'demo', message: 'Vercel demo license', expires_at: null, trial_remaining: 14 });
 });
-
 app.post('/api/auth/login', (req, res) => {
   const username = String((req.body && req.body.username) || '').trim();
   const password = String((req.body && req.body.password) || '');
@@ -69,54 +48,51 @@ app.post('/api/auth/login', (req, res) => {
   const t = token();
   const safe = { id: user.id, username: user.username, full_name: user.full_name, role: user.role };
   sessions.set(t, { user: safe, at: Date.now() });
-  res.json({ token: t, user: safe });
+  res.json({ token: t, user: safe, settings: { store_name: 'Lorraine Traders' } });
 });
-
 app.get('/api/auth/me', requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
-
 app.post('/api/auth/logout', requireAuth, (req, res) => {
   sessions.delete(req.token);
   res.json({ ok: true });
 });
-
 app.get('/api/dashboard', requireAuth, (req, res) => {
   const todayRevenue = orders.reduce((s, o) => s + (o.total || 0), 0);
   res.json({
+    todaySales: orders.length,
+    todayRevenue: todayRevenue,
     today_orders: orders.length,
     today_revenue: todayRevenue,
+    totalProducts: products.filter((p) => p.active).length,
     total_products: products.filter((p) => p.active).length,
+    lowStockCount: products.filter((p) => p.active && p.stock <= p.min_stock).length,
     low_stock: products.filter((p) => p.active && p.stock <= p.min_stock).length,
+    recentOrders: orders.slice(-5).reverse(),
     recent_orders: orders.slice(-5).reverse(),
+    topProducts: [],
   });
 });
-
 app.get('/api/products', requireAuth, (req, res) => {
   const q = String(req.query.q || '').toLowerCase();
   let list = products.filter((p) => p.active);
-  if (q) {
-    list = list.filter(
-      (p) => p.name.toLowerCase().includes(q) || String(p.barcode).includes(q)
-    );
-  }
+  if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || String(p.barcode).includes(q));
   res.json(list);
 });
-
 app.get('/api/products/:id', requireAuth, (req, res) => {
   const p = products.find((x) => String(x.id) === String(req.params.id));
   if (!p) return res.status(404).json({ error: 'Not found' });
   res.json(p);
 });
-
+app.get('/api/settings', requireAuth, (req, res) => {
+  res.json({ store_name: 'Lorraine Traders', currency: 'KSh', tax_rate: '0', receipt_footer: 'Thank you for shopping with us' });
+});
 app.get('/api/categories', requireAuth, (req, res) => {
   res.json(categories);
 });
-
 app.get('/api/orders', requireAuth, (req, res) => {
   res.json(orders.slice().reverse());
 });
-
 app.post('/api/orders', requireAuth, (req, res) => {
   const body = req.body || {};
   const items = Array.isArray(body.items) ? body.items : [];
@@ -128,36 +104,18 @@ app.post('/api/orders', requireAuth, (req, res) => {
     const line = price * qty;
     total += line;
     if (product) product.stock = Math.max(0, product.stock - qty);
-    return {
-      product_id: product ? product.id : it.product_id,
-      name: product ? product.name : it.name || 'Item',
-      qty,
-      price,
-      total: line,
-    };
+    return { product_id: product ? product.id : it.product_id, name: product ? product.name : it.name || 'Item', qty, price, total: line };
   });
-  const order = {
-    id: nextOrderId++,
-    total,
-    payment_method: body.payment_method || 'cash',
-    user_name: req.user.full_name,
-    created_at: new Date().toISOString(),
-    items: lineItems,
-  };
+  const order = { id: nextOrderId++, total, payment_method: body.payment_method || 'cash', user_name: req.user.full_name, created_at: new Date().toISOString(), items: lineItems };
   orders.push(order);
   res.json(order);
 });
-
 app.get('/api/reports/summary', requireAuth, (req, res) => {
   const revenue = orders.reduce((s, o) => s + (o.total || 0), 0);
   res.json({ orders: orders.length, revenue, products: products.length });
 });
-
 app.use((req, res) => {
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({ error: 'Not found' });
-  }
+  if ((req.path || '').startsWith('/api')) return res.status(404).json({ error: 'Not found' });
   res.status(404).json({ error: 'Not found' });
 });
-
 module.exports = app;
