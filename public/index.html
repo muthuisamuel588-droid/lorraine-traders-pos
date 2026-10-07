@@ -1,18 +1,97 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lorraine Traders POS</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lorraine Traders POS — Demo</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: #0b1220; color: #e8eefc;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 420px; background: #121a2b; border: 1px solid #243049;
+      border-radius: 16px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 6px; font-size: 1.45rem; }
+    p { margin: 0 0 18px; color: #9db0d0; line-height: 1.45; font-size: .95rem; }
+    label { display: block; font-size: .8rem; color: #9db0d0; margin-bottom: 6px; }
+    input {
+      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #2c3c5a;
+      background: #0b1220; color: #e8eefc; margin-bottom: 14px; font-size: 1rem;
+    }
+    button {
+      width: 100%; padding: 12px 14px; border: 0; border-radius: 10px;
+      background: #3b82f6; color: white; font-weight: 600; font-size: 1rem; cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    .msg { margin-top: 14px; font-size: .9rem; min-height: 1.2em; }
+    .ok { color: #4ade80; }
+    .err { color: #f87171; }
+    .hint {
+      margin-top: 18px; padding-top: 16px; border-top: 1px solid #243049;
+      font-size: .82rem; color: #7f93b3; line-height: 1.5;
+    }
+    code { background: #0b1220; padding: 2px 6px; border-radius: 6px; color: #c4d4f5; }
+    a { color: #93c5fd; }
+  </style>
 </head>
 <body>
-
-  <!-- ROOT CONTAINER - the app renders everything here -->
-  <div id="app"></div>
-
-  <!-- Receipt markup must load before app.js: app.js renders with it at print time. -->
-  <script src="/js/receipt.js"></script>
-  <script src="/js/app.js"></script>
+  <div class="card">
+    <h1>Lorraine Traders POS</h1>
+    <p>Serverless demo on Vercel. Data is in-memory and resets on cold starts.</p>
+    <form id="loginForm">
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" value="admin" />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" value="admin123" />
+      <button type="submit" id="btn">Sign in</button>
+    </form>
+    <div class="msg" id="msg"></div>
+    <div class="hint">
+      Demo accounts: <code>admin</code> / <code>admin123</code> or
+      <code>cashier</code> / <code>cashier123</code><br />
+      API health: <a href="/api/health">/api/health</a>
+    </div>
+  </div>
+  <script>
+    const form = document.getElementById('loginForm');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('btn');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'msg';
+      msg.textContent = '';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+        msg.className = 'msg ok';
+        msg.textContent = 'Signed in as ' + (data.user && data.user.full_name) + ' (' + data.user.role + ').';
+        localStorage.setItem('pos_token', data.token);
+        localStorage.setItem('pos_user', JSON.stringify(data.user));
+        const dash = await fetch('/api/dashboard', {
+          headers: { 'x-auth-token': data.token },
+        }).then((r) => r.json());
+        msg.textContent += ' Products in demo: ' + (dash.total_products || 0) + '.';
+      } catch (err) {
+        msg.className = 'msg err';
+        msg.textContent = err.message || String(err);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>
